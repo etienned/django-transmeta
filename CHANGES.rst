@@ -1,3 +1,15 @@
+0.8.1 (2017-07-10)
+-------------------
+
+- Fix CHANGES, setup and AUTHORS
+
+0.8.0 (2017-07-10)
+-------------------
+
+- Python3 compatibility
+- Django 1.11 compatibility
+- Code cleanup
+
 0.7.3 (2013-09-02)
 -------------------
 
@@ -42,7 +54,7 @@
 0.6.7 (2012-03-20)
 ------------------
 
-- Change the representation (verbose_name) of the transmeta labels 
+- Change the representation (verbose_name) of the transmeta labels
 
 
 0.6.6 (2012-02-06)
