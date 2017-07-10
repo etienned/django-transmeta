@@ -1,15 +1,23 @@
 import copy
+from collections import OrderedDict
 
 from django.db import models
 from django.db.models.fields import NOT_PROVIDED
 from django.conf import settings
 from django.core.exceptions import ImproperlyConfigured
-from django.utils.datastructures import SortedDict
-from django.utils.translation import get_language, ugettext_lazy as _
+from django.utils.encoding import python_2_unicode_compatible
+from django.utils.translation import (
+    get_language as django_get_language, ugettext_lazy as _
+)
 
 
 LANGUAGE_CODE = 0
 LANGUAGE_NAME = 1
+
+
+def get_language():
+    language = django_get_language()
+    return settings.LANGUAGE_CODE if language is None else language
 
 
 def get_languages():
@@ -68,15 +76,16 @@ def get_all_translatable_fields(model, model_trans_fields=None, column_in_curren
 
 
 def default_value(field):
-    '''
+    """
     When accessing to the name of the field itself, the value
     in the current language will be returned. Unless it's set,
     the value in the default language will be returned.
-    '''
+    """
+
+    def attname(language):
+        return get_real_fieldname(field, language)
 
     def default_value_func(self):
-        attname = lambda x: get_real_fieldname(field, x)
-
         if getattr(self, attname(get_language()), None):
             result = getattr(self, attname(get_language()))
         elif getattr(self, attname(get_language()[:2]), None):
@@ -93,7 +102,7 @@ def default_value(field):
 
 
 class TransMeta(models.base.ModelBase):
-    '''
+    """
     Metaclass that allow a django field, to store a value for
     every language. The syntax to us it is next:
 
@@ -110,18 +119,20 @@ class TransMeta(models.base.ModelBase):
     <field_name>_<language_code>. If just <field_name> is
     accessed, we'll get the value of the current language,
     or if null, the value in the default language.
-    '''
+    """
 
     def __new__(cls, name, bases, attrs):
-        attrs = SortedDict(attrs)
+        attrs = OrderedDict(attrs)
         if 'Meta' in attrs and hasattr(attrs['Meta'], 'translate'):
             fields = attrs['Meta'].translate
             delattr(attrs['Meta'], 'translate')
         else:
             new_class = super(TransMeta, cls).__new__(cls, name, bases, attrs)
             # we inherits possible translatable_fields from superclasses
-            abstract_model_bases = [base for base in bases if hasattr(base, '_meta') \
-                                    and base._meta.abstract]
+            abstract_model_bases = [
+                base for base in bases
+                if hasattr(base, '_meta') and base._meta.abstract
+            ]
             translatable_fields = []
             for base in abstract_model_bases:
                 if hasattr(base._meta, 'translatable_fields'):
@@ -133,12 +144,13 @@ class TransMeta(models.base.ModelBase):
             raise ImproperlyConfigured("Meta's translate attribute must be a tuple")
 
         for field in fields:
-            if not field in attrs or \
+            if field not in attrs or \
                not isinstance(attrs[field], models.fields.Field):
                     raise ImproperlyConfigured(
-                        "There is no field %(field)s in model %(name)s, "\
-                        "as specified in Meta's translate attribute" % \
-                        dict(field=field, name=name))
+                        "There is no field %(field)s in model %(name)s, "
+                        "as specified in Meta's translate attribute" %
+                        dict(field=field, name=name)
+                    )
             original_attr = attrs[field]
             for lang in get_languages():
                 lang_code = lang[LANGUAGE_CODE]
@@ -164,11 +176,12 @@ class TransMeta(models.base.ModelBase):
         return new_class
 
 
+@python_2_unicode_compatible
 class LazyString(object):
 
     def __init__(self, proxy, lang):
         self.proxy = proxy
         self.lang = lang
 
-    def __unicode__(self):
-        return u'%s (%s)' % (self.proxy, self.lang)
+    def __str__(self):
+        return '%s (%s)' % (self.proxy, self.lang)
